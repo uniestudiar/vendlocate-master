@@ -1,0 +1,14 @@
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "functions": {
+    "api/scan.js": {
+      "maxDuration": 300
+    },
+    "api/overpass.js": {
+      "maxDuration": 60
+    }
+  }
+}
