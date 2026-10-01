@@ -1,12 +1,41 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const configuredSupabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
+function validateSupabaseUrl(value: string): string | null {
+  if (!value) return 'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the deployment environment.';
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return 'VITE_SUPABASE_URL must be the project URL, such as https://your-project-ref.supabase.co. Do not use the Supabase dashboard URL or project ID.';
+  }
+
+  if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) {
+    return 'VITE_SUPABASE_URL must be an absolute HTTPS project URL, such as https://your-project-ref.supabase.co.';
+  }
+
+  if (parsed.pathname !== '/' || parsed.search || parsed.hash) {
+    return 'VITE_SUPABASE_URL must contain only the Supabase project origin, such as https://your-project-ref.supabase.co, with no path or query string.';
+  }
+
+  if (parsed.hostname === 'supabase.com' || parsed.hostname.endsWith('.supabase.com')) {
+    return 'VITE_SUPABASE_URL is using a Supabase dashboard URL. Use the project URL from Supabase Settings > API instead, such as https://your-project-ref.supabase.co.';
+  }
+
+  return null;
+}
+
+const supabaseUrl = configuredSupabaseUrl.replace(/\/+$/, '');
+const supabaseUrlError = validateSupabaseUrl(supabaseUrl);
+
 export const supabaseConfigError =
-  !supabaseUrl || !supabaseAnonKey
+  supabaseUrlError ||
+  (!supabaseAnonKey
     ? 'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the deployment environment.'
-    : null;
+    : null);
 
 export const supabase = createClient(
   supabaseUrl || 'https://placeholder.supabase.co',
