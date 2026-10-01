@@ -123,10 +123,12 @@ function extractLinks(html, baseUrl) {
     if (!href || href.startsWith('mailto:') || href.startsWith('tel:')) continue;
     try {
       const absolute = new URL(href, baseUrl).href;
-      links.push(absolute);
+      const path = new URL(absolute).pathname.toLowerCase();
+      const priority = /(contact|about|team|staff|location|service|support|connect|employment|privacy)/.test(path) ? 0 : 1;
+      links.push({ url: absolute, priority });
     } catch {}
   }
-  return links;
+  return links.sort((a, b) => a.priority - b.priority).map((link) => link.url);
 }
 
 // ─── Fetching ─────────────────────────────────────────────────────────────
@@ -735,7 +737,7 @@ export default async function handler(req, res) {
   const visited = new Set();
   const queue = [{ url: baseUrl, depth: 0 }];
   let crawledCount = 0;
-  let crawlDeadline = Date.now() + 25000;
+  const crawlDeadline = Date.now() + 25000;
 
   while (queue.length > 0 && crawledCount < MAX_CRAWL && Date.now() < crawlDeadline) {
     const batch = queue.splice(0, 3);

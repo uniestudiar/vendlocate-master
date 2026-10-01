@@ -32,6 +32,11 @@ export async function findEmailForBusiness(place: {
       }),
       signal: AbortSignal.timeout(25000),
     });
+    const contentType = (resp.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.includes('application/json')) {
+      console.warn('Email finder returned a non-JSON response:', resp.status, contentType);
+      return { email: null, method: null, smtpVerified: false };
+    }
     if (resp.ok) {
       const data = await resp.json();
       if (data.emails && data.emails.length > 0) {
@@ -39,14 +44,14 @@ export async function findEmailForBusiness(place: {
         if (data.verified?.length > 0) {
           const verified = data.verified[0];
           return {
-            email: verified.email,
+            email: String(verified.email).trim().toLowerCase(),
             method: verified.source === 'generated' ? 'inferred' : 'crawl',
             smtpVerified: true,
             candidateCount: data.allResults?.length || 0,
           };
         }
         return {
-          email: data.emails[0],
+          email: String(data.emails[0]).trim().toLowerCase(),
           method: 'crawl',
           smtpVerified: false,
           candidateCount: data.allResults?.length || 0,
