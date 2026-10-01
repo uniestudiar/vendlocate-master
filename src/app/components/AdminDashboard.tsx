@@ -1318,7 +1318,7 @@ export default function AdminDashboard() {
               }`}
             >
               <Settings className="w-4 h-4 inline mr-2" />
-              Database
+              Settings
             </button>
             <button
               onClick={() => setCurrentTab('emailHistory')}
@@ -2206,14 +2206,13 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Database Tab */}
+        {/* Settings Tab */}
         {currentTab === 'settings' && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-1">Outreach Settings</h2>
               <p className="text-gray-600 mb-6">
-                Save the contact details used by the outreach engine. Leads and sent-email history sync
-                automatically when the discovery program runs.
+                Customize the contact details and email template used by the outreach engine.
               </p>
 
               {settingsStatus && (
