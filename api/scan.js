@@ -1159,7 +1159,7 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: authError || 'Unauthorized' });
     }
 
-    // Use service role key to bypass RLS for DB writes
+    // Use the server-side database connection for authorized writes.
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
     });
@@ -1181,7 +1181,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'No active purchase found.' });
     }
 
-    const inputPlaces = Array.isArray(places) ? places : [];
+    const inputPlaces = Array.isArray(places) ? places.slice(0, 5000) : [];
+    if (Array.isArray(places) && places.length > 5000) {
+      return res.status(413).json({ error: 'This search returned too many businesses. Narrow the search area or choose fewer business types and try again.' });
+    }
     if (inputPlaces.length === 0) {
       return res.status(200).json({
         success: true,
@@ -1200,7 +1203,7 @@ export default async function handler(req, res) {
         .from('email_history')
         .select('recipient')
         .eq('user_id', user.id)
-        .limit(10000);
+        .limit(5000);
       if (emailed) {
         for (const e of emailed) {
           if (e.recipient) alreadyEmailed.add(e.recipient.toLowerCase());
@@ -1208,10 +1211,10 @@ export default async function handler(req, res) {
       }
     } catch (historyReadError) {
       console.error('Email history lookup failed:', historyReadError);
-      return res.status(500).json({ error: 'Unable to read email history. Verify the email_history table and RLS policies.' });
+      return res.status(500).json({ error: 'Unable to load your email history. Please try again later.' });
     }
 
-    // Check for existing leads in database to avoid duplicate processing and save API tokens
+    // Check for existing leads to avoid duplicates and reduce external API usage.
     const existingPlaceIds = new Set();
     try {
       const { data: existing } = await supabase

@@ -86,7 +86,7 @@ export default function LandingPage() {
               If a business doesn't respond within 48 hours, we automatically send a follow-up email. No extra work needed.
             </p>
             <p className="text-lg font-medium bg-white/10 backdrop-blur rounded-lg p-4">
-              Our database contains extensively researched locations with contact information, foot traffic estimates, and ranked viability scores. Access requires a one-time payment to unlock your area's complete lead package.
+              Your lead package includes researched locations, contact information, foot-traffic estimates, and ranked opportunity scores. A one-time payment unlocks the complete package for your area.
             </p>
           </div>
         </div>

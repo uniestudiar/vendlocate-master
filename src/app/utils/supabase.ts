@@ -4,25 +4,25 @@ const configuredSupabaseUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 function validateSupabaseUrl(value: string): string | null {
-  if (!value) return 'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the deployment environment.';
+  if (!value) return 'Account services are not configured. Please contact support.';
 
   let parsed: URL;
   try {
     parsed = new URL(value);
   } catch {
-    return 'VITE_SUPABASE_URL must be the project URL, such as https://your-project-ref.supabase.co. Do not use the Supabase dashboard URL or project ID.';
+    return 'Account services are unavailable because the site configuration is invalid. Please contact support.';
   }
 
   if (parsed.protocol !== 'https:' || !parsed.hostname) {
-    return 'VITE_SUPABASE_URL must be an absolute HTTPS project URL, such as https://your-project-ref.supabase.co.';
+    return 'Account services are unavailable because the site configuration is invalid. Please contact support.';
   }
 
   if (parsed.pathname !== '/' || parsed.search || parsed.hash) {
-    return 'VITE_SUPABASE_URL must contain only the Supabase project origin, such as https://your-project-ref.supabase.co, with no path or query string.';
+    return 'Account services are unavailable because the site configuration is invalid. Please contact support.';
   }
 
   if (parsed.hostname === 'supabase.com' || parsed.hostname.endsWith('.supabase.com')) {
-    return 'VITE_SUPABASE_URL is using a Supabase dashboard URL. Use the project URL from Supabase Settings > API instead, such as https://your-project-ref.supabase.co.';
+    return 'Account services are unavailable because the site configuration is invalid. Please contact support.';
   }
 
   return null;
@@ -34,7 +34,7 @@ const supabaseUrlError = validateSupabaseUrl(supabaseUrl);
 export const supabaseConfigError =
   supabaseUrlError ||
   (!supabaseAnonKey
-    ? 'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the deployment environment.'
+    ? 'Account services are not configured. Please contact support.'
     : null);
 
 export const supabase = createClient(
@@ -499,7 +499,7 @@ async function directSupabaseCall(endpoint: string, options: RequestInit = {}) {
         emailsFound: emailsFoundCount,
         emailsSent: 0,
         success: true,
-        message: `Saved ${leadRows.length} businesses to database (browser mode). Found ${emailsFoundCount} emails via scraping.`,
+        message: `Saved ${leadRows.length} businesses. Found ${emailsFoundCount} emails via website scanning.`,
       };
     }
 
@@ -518,7 +518,7 @@ async function directSupabaseCall(endpoint: string, options: RequestInit = {}) {
     };
   }
 
-  console.warn(`Direct Supabase fallback: no handler for ${endpoint}`);
+  console.warn(`Direct account-service fallback: no handler for ${endpoint}`);
   return { success: true };
 }
 

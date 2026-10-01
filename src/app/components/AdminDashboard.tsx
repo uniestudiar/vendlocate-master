@@ -627,13 +627,13 @@ export default function AdminDashboard() {
       if (!confirm) return;
     }
 
-    // Validate phone + Gmail app password before scan
+    // Validate contact details before scan
     if (!settings.phone || settings.phone.length < 10) {
       alert('Please add your phone number in the Settings tab before running a scan.\n\nGo to Settings → Outreach Settings → Phone Number.');
       return;
     }
     if (!settings.smtpAppPassword || settings.smtpAppPassword.length < 10) {
-      alert('Please set your Gmail App Password in the Settings tab before running a scan.\n\nThis is NOT your Gmail password — it is a 16-character app-specific password generated from your Google Account.\n\nGo to Settings → Outreach Settings → Gmail App Password.');
+      alert('Please add your secure email app password in Settings before running a scan.\n\nThis is not your regular email password. It is a separate app-specific password from your email provider.');
       return;
     }
 
@@ -807,7 +807,7 @@ export default function AdminDashboard() {
 
     // Send discovered places to engine for email scraping + persistence
     addTerminalLine('');
-    addTerminalLine('Saving businesses to database with email discovery...');
+    addTerminalLine('Saving businesses with email discovery...');
 
     let saveResult: any = null;
     if (discoveredPlaces.length > 0) {
@@ -815,7 +815,7 @@ export default function AdminDashboard() {
         saveResult = await saveDiscoveredPlacesDirectly(discoveredPlaces);
         directSaveEmailsFound = saveResult?.emailsFound || 0;
         const savedCount = saveResult?.savedCount || 0;
-        addTerminalLine(`Saved ${savedCount} businesses to database. Found ${directSaveEmailsFound} emails.`);
+        addTerminalLine(`Saved ${savedCount} businesses. Found ${directSaveEmailsFound} emails.`);
       } catch (err: any) {
         addTerminalLine(`⚠ Save error: ${err?.message || 'unknown'}`);
       }
@@ -832,8 +832,8 @@ export default function AdminDashboard() {
         setFilteredLeads(saveResult.leads);
         addTerminalLine(`Loaded ${saveResult.leads.length} leads into dashboard.`);
       } else {
-        // Fallback: try Supabase directly
-        addTerminalLine('Checking database for leads...');
+        // Fallback: try the connected account service directly
+        addTerminalLine('Checking your saved leads...');
         let localUserId: string | null = null;
         try {
           const { data: { user } } = await supabase.auth.getUser();
@@ -872,7 +872,7 @@ export default function AdminDashboard() {
             }));
             setLeads(mapped);
             setFilteredLeads(mapped);
-            addTerminalLine(`Loaded ${mapped.length} leads from database.`);
+            addTerminalLine(`Loaded ${mapped.length} saved leads.`);
           } else {
             addTerminalLine('Leads saved — they will appear on next page load.');
           }
@@ -906,7 +906,7 @@ export default function AdminDashboard() {
     }
   };
 
-  // Save discovered places directly to Supabase when Edge Function is unavailable
+  // Save discovered places directly when the server endpoint is unavailable.
   const saveDiscoveredPlacesDirectly = async (places: any[]) => {
     let localUserId: string | null = null;
     try {
@@ -915,16 +915,16 @@ export default function AdminDashboard() {
     } catch {}
     if (!localUserId) return;
 
-    // Check for existing places in database to avoid duplicates and save API tokens
+    // Check for existing places to avoid duplicates and reduce external API usage.
     const { data: existingLeads } = await supabase
       .from('leads')
       .select('place_id, business_name, city, state')
       .eq('user_id', localUserId);
     const existingPlaceIds = new Set((existingLeads || []).map(l => l.place_id));
     const existingNames = new Set((existingLeads || []).map(l => `${l.business_name.toLowerCase()}|${l.city.toLowerCase()}|${l.state.toLowerCase()}`));
-    addTerminalLine(`  Found ${existingPlaceIds.size} existing leads in database — skipping duplicates`);
+    addTerminalLine(`  Found ${existingPlaceIds.size} existing leads — skipping duplicates`);
 
-    // Read the active purchase from Supabase only.
+    // Read the active purchase from the signed-in account.
     let purchaseId: string | null = null;
     const { data: purchase } = await supabase
       .from('purchases')
@@ -1017,7 +1017,7 @@ export default function AdminDashboard() {
     }
 
     if (skippedCount > 0) {
-      addTerminalLine(`  Skipped ${skippedCount} duplicate businesses already in database`);
+      addTerminalLine(`  Skipped ${skippedCount} duplicate businesses already in your lead list`);
     }
 
     // Try to find websites for businesses without one (batched)
@@ -1345,7 +1345,7 @@ export default function AdminDashboard() {
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">Preview the lead engine before you buy</h2>
                     <p className="text-gray-600 mt-1">
-                      Buy a search package, enter your location once, and the database will fill automatically after
+                      Buy a search package, enter your location once, and your lead list will fill automatically after
                       the lead program runs.
                     </p>
                   </div>
@@ -2110,7 +2110,7 @@ export default function AdminDashboard() {
                 <p className="text-gray-500">
                   {leads.length === 0
                     ? 'No live leads yet. No-website opportunities will appear here after the first scan runs.'
-                    : 'All businesses in your current database have websites.'}
+                    : 'All businesses in your current lead list have websites.'}
                 </p>
               </div>
             )}
@@ -2249,7 +2249,7 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Gmail App Password</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Secure Email App Password</label>
                   <div className="relative">
                     <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <input
@@ -2264,11 +2264,11 @@ export default function AdminDashboard() {
               </div>
 
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-amber-900 font-medium mb-2">What is a Gmail App Password?</p>
+                <p className="text-sm text-amber-900 font-medium mb-2">What is a secure email app password?</p>
                 <p className="text-sm text-amber-800 mb-3">
-                  A Gmail App Password is a <strong>16-character one-time code</strong> generated by Google that lets Vendlocate send emails from your Gmail address. It is <strong>NOT your Gmail password</strong> — you never share your real password.
+                  A secure email app password is a <strong>separate code</strong> from your email provider that lets VendLocate send messages without sharing your regular password.
                 </p>
-                <p className="text-sm font-medium text-amber-900 mb-1">How to generate one:</p>
+                <p className="text-sm font-medium text-amber-900 mb-1">How to generate one with Gmail:</p>
                 <ol className="list-decimal list-inside text-sm text-amber-800 space-y-1">
                   <li>Go to your <a href="https://myaccount.google.com/security" target="_blank" className="underline font-medium">Google Account Security settings</a></li>
                   <li>Turn on <strong>2-Step Verification</strong> if not already enabled</li>
@@ -2277,7 +2277,7 @@ export default function AdminDashboard() {
                   <li>Copy the generated 16-character code and paste it here</li>
                 </ol>
                 <p className="text-xs text-amber-700 mt-2">
-                  This password is stored securely and only used to send outreach emails through your Gmail account.
+                  This password is stored securely and used only for your outreach messages.
                 </p>
               </div>
 
