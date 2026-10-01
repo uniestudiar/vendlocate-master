@@ -31,6 +31,19 @@
 
 ## 🚀 Deployment Steps
 
+### 0. Vercel Web Analytics
+
+The app includes `@vercel/analytics` in the production bundle and renders the
+`<Analytics />` component from `src/main.tsx`. To start collecting visits:
+
+1. Import this repository into Vercel and deploy the `main` branch.
+2. In the Vercel project, open **Analytics** and click **Enable**.
+3. Visit the deployed site once, then allow a few minutes for data to appear.
+
+Analytics data is viewed in the Vercel dashboard; no analytics API key is
+required in the application environment. The package is also recorded in both
+`package.json` and `package-lock.json` so production installs are reproducible.
+
 ### 1. Set Up Supabase Database
 
 Run this SQL in your Supabase SQL Editor:
@@ -115,6 +128,14 @@ When emails are sent to businesses, these get replaced:
    - Status updated in dashboard
 
 ## 🔧 Integration with Python Code
+
+The repository **does include** the outreach implementation under
+`src/imports/`, including `outreach.py`, `main.py`, `replyScanner.py`, and
+Supabase synchronization code. It is not currently executed by Vercel:
+Vercel runs the Vite frontend and JavaScript serverless functions, but it does
+not run this Windows/Python process as a scheduled worker. The scripts must be
+run on a separate Python host, or converted into a deployed TypeScript/Edge
+Function worker before outreach can be fully automated after a purchase.
 
 Your Python scripts (`config.py`, `scraper.py`, etc.) need to be triggered after purchase:
 
