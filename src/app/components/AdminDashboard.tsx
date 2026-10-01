@@ -848,29 +848,28 @@ export default function AdminDashboard() {
     addTerminalLine('--- PHASE 5: LOADING RESULTS ---');
     addTerminalLine('Loading leads into dashboard...');
     try {
-      if (saveResult?.leads && saveResult.leads.length > 0) {
-        setLeads(saveResult.leads);
-        setFilteredLeads(saveResult.leads);
-        addTerminalLine(`Loaded ${saveResult.leads.length} leads into dashboard.`);
-      } else {
-        // Reload the complete saved list, including when this scan added no new rows.
-        addTerminalLine('Checking your saved leads...');
-        let data: any[] | null = null;
+      // Always reload the complete saved list, including existing rows when a
+      // repeat scan only finds businesses that were already saved.
+      addTerminalLine('Checking your saved leads...');
+      let data: any[] | null = null;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const result = await supabase
+          .from('leads')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        if (!result.error) data = result.data || [];
+      }
+      if (!data) {
         try {
           const response = await apiCall('/leads');
-          data = response.leads || null;
-        } catch {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const result = await supabase
-              .from('leads')
-              .select('*')
-              .eq('user_id', user.id)
-              .order('created_at', { ascending: false });
-            data = result.data || null;
-          }
+          data = response?.leads || [];
+        } catch (loadError: any) {
+          addTerminalLine(`Unable to reload saved leads: ${loadError?.message || 'request failed'}`);
         }
-        if (data && data.length > 0) {
+      }
+      if (data && data.length > 0) {
             const mapped = data.map((lead: any) => ({
               id: lead.id || String(Math.random()),
               businessName: lead.business_name || 'Unknown Business',
@@ -898,12 +897,11 @@ export default function AdminDashboard() {
           setLeads(mapped);
           setFilteredLeads(mapped);
           addTerminalLine(`Loaded ${mapped.length} saved leads.`);
-        } else {
-          addTerminalLine('No saved leads were returned. Refresh once and try again if this is unexpected.');
-        }
+      } else {
+        addTerminalLine('No saved leads were returned. Refresh once and try again if this is unexpected.');
       }
     } catch {
-      addTerminalLine('Leads saved — reload the page to see them.');
+      addTerminalLine('Unable to load saved leads after the scan. Your scan results may still be saved; refresh and try again.');
     }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
