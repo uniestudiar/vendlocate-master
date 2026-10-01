@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Mail, Lock, User, ArrowLeft, MapPin, Loader2 } from 'lucide-react';
-import { supabase, supabaseConfigError } from '../utils/supabase';
+import { authRedirectUrl, supabase, supabaseConfigError } from '../utils/supabase';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -39,7 +39,7 @@ export default function Register() {
           data: {
             full_name: formData.name,
           },
-          emailRedirectTo: `${window.location.origin}/verify-email`,
+          emailRedirectTo: `${authRedirectUrl}/verify-email`,
         },
       });
 

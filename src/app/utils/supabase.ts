@@ -42,6 +42,10 @@ export const supabase = createClient(
   supabaseAnonKey || 'placeholder-anon-key'
 );
 
+const configuredSiteUrl = (import.meta.env.VITE_SITE_URL || '').trim().replace(/\/+$/, '');
+export const authRedirectUrl =
+  configuredSiteUrl || (typeof window !== 'undefined' ? window.location.origin : '');
+
 export const API_URL =
   import.meta.env.VITE_SUPABASE_FUNCTIONS_URL ||
   (supabaseUrl ? `${supabaseUrl}/functions/v1/make-server-de060722` : '');
