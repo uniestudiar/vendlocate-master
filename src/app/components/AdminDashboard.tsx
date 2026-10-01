@@ -1137,6 +1137,9 @@ export default function AdminDashboard() {
     // Cache to localStorage so it loads on page refresh
     try {
       localStorage.setItem('vendlocate_leads', JSON.stringify(cleanRows));
+    } catch (cacheError: any) {
+      console.warn('Unable to cache leads locally:', cacheError?.message || cacheError);
+    }
 
     // Map to Lead[] format for the frontend
     const mappedLeads: Lead[] = cleanRows.map((lead: any) => ({
@@ -1164,7 +1167,7 @@ export default function AdminDashboard() {
       userLocationId: lead.user_location_id || undefined,
     }));
 
-    return { emailsFound, savedCount: cleanRows.length, leads: mappedLeads };
+    return { emailsFound, savedCount, leads: mappedLeads };
   };
 
   return (
