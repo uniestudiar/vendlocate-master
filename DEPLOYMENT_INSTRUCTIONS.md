@@ -230,6 +230,33 @@ outreach delivery and rows in `sent_emails` require the separate Python worker
 - [ ] Rate limiting (TODO: add to Edge Functions)
 - [ ] Input validation (TODO: add more comprehensive checks)
 
+## 📈 Capacity and reliability notes
+
+The application is designed so each account only reads and writes its own
+leads, purchases, locations, and email history. The main tables have indexes
+for account ownership, location, status, and timestamps, and scans cap a
+single request at 5,000 businesses so one customer cannot create an
+unbounded request for everyone else.
+
+Before a high-traffic launch:
+
+1. Use a paid database and email plan sized for the expected number of
+   accounts; free service quotas are not production capacity guarantees.
+2. Keep the committed lockfile and deploy the same production build from
+   `main`.
+3. Enable Vercel deployment protection, function logs, spend alerts, and
+   rate limiting/WAF rules in the project dashboard.
+4. Run a load test against a preview deployment with test payments enabled
+   only in that non-production environment.
+5. Monitor scan duration, failed requests, database connection usage, email
+   provider quotas, and external search API quotas before opening access
+   broadly.
+
+The website and serverless API can serve many simultaneous accounts, but no
+software can guarantee unlimited traffic. Capacity depends on the selected
+hosting/database/email plans and the quotas of Google, map-search, and email
+providers.
+
 ## 📱 User Journey
 
 1. **Sign Up** → Enter name, email, password

@@ -79,9 +79,9 @@ export default function EmailVerification() {
         },
       });
       if (error) throw error;
-      setError('Confirmation email resent. Check your inbox and spam folder. If it does not arrive, verify Supabase Auth email settings and SMTP configuration.');
+      setError('Confirmation email resent. Check your inbox and spam folder. If it does not arrive, contact support or try again later.');
     } catch (err: any) {
-      setError(err.message || 'Failed to resend. You may need to configure SMTP in your Supabase dashboard.');
+      setError(err.message || 'Failed to resend the confirmation email. Please try again later.');
     }
   };
 
