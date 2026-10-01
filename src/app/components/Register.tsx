@@ -39,13 +39,14 @@ export default function Register() {
           data: {
             full_name: formData.name,
           },
+          emailRedirectTo: `${window.location.origin}/verify-email`,
         },
       });
 
       if (signUpError) throw signUpError;
       if (!data.user) throw new Error('Account creation did not return a user.');
 
-      sessionStorage.setItem('pending_verification_email', formData.email);
+      sessionStorage.setItem('pending_verification_email', formData.email.trim().toLowerCase());
       setIsLoading(false);
       navigate('/verify-email');
     } catch (err: any) {
