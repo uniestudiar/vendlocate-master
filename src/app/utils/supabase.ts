@@ -203,6 +203,15 @@ async function directSupabaseCall(endpoint: string, options: RequestInit = {}) {
 
   if (endpoint === '/user-location' && options.method === 'POST') {
     const body = JSON.parse(options.body as string);
+    const { data: lockState, error: lockError } = await supabase
+      .from('users')
+      .select('location_locked')
+      .eq('id', userId)
+      .single();
+    if (lockError) throw lockError;
+    if (lockState?.location_locked) {
+      throw new Error('Your search location is locked after the first scan. Purchase an additional location to change it.');
+    }
     const { error } = await supabase
       .from('users')
       .update({
@@ -307,6 +316,15 @@ async function directSupabaseCall(endpoint: string, options: RequestInit = {}) {
 
   if (endpoint === '/search-settings' && options.method === 'POST') {
     const body = JSON.parse(options.body as string);
+    const { data: lockState, error: lockError } = await supabase
+      .from('users')
+      .select('location_locked')
+      .eq('id', userId)
+      .single();
+    if (lockError) throw lockError;
+    if (lockState?.location_locked) {
+      throw new Error('Your search selections are locked after the first scan. Purchase additional selections to change them.');
+    }
     const { error } = await supabase
       .from('users')
       .update({
