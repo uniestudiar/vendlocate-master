@@ -1,6 +1,8 @@
 const OVERPASS_ENDPOINTS = [
   'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
   'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
 ];
 
 async function fetchEndpoint(endpoint, query) {
@@ -17,12 +19,14 @@ async function fetchEndpoint(endpoint, query) {
       },
       signal: controller.signal,
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      return { error: `${endpoint} returned HTTP ${response.status}` };
+    }
     const data = await response.json();
     if (data && data.elements) return data;
-    return null;
+    return { error: `${endpoint} returned an invalid response` };
   } catch {
-    return null;
+    return { error: `${endpoint} could not be reached` };
   } finally {
     clearTimeout(timeout);
   }
@@ -43,12 +47,17 @@ export default async function handler(req, res) {
     OVERPASS_ENDPOINTS.map(ep => fetchEndpoint(ep, query))
   );
 
+  const errors = [];
   for (const r of results) {
-    if (r.status === 'fulfilled' && r.value) {
+    if (r.status === 'fulfilled' && r.value && !r.value.error) {
       res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate');
       return res.status(200).json(r.value);
     }
+    if (r.status === 'fulfilled' && r.value?.error) errors.push(r.value.error);
+    if (r.status === 'rejected') errors.push(r.reason?.message || 'Unknown Overpass error');
   }
 
-  return res.status(502).json({ error: 'All Overpass endpoints failed' });
+  return res.status(502).json({
+    error: `All Overpass endpoints failed${errors.length ? `: ${errors.join('; ')}` : ''}`,
+  });
 }

@@ -3,6 +3,8 @@ import { expandBusinessTypeToOsmTags } from './osmTags';
 const OVERPASS_ENDPOINTS = [
   'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
   'https://overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
 ];
 
 const OVERPASS_HEADERS = {
@@ -35,7 +37,7 @@ function buildBboxOverpassQuery(tags, bbox, resultLimit = 2000) {
     if (v === '*') return `node["${k}"]${bboxFilter};way["${k}"]${bboxFilter};relation["${k}"]${bboxFilter};`;
     return `node["${k}"="${v}"]${bboxFilter};way["${k}"="${v}"]${bboxFilter};relation["${k}"="${v}"]${bboxFilter};`;
   }).join('');
-  return `[out:json][timeout:40];(${filterBlocks});out body center tags qt ${resultLimit};`;
+  return `[out:json][timeout:40];(${filterBlocks});out body center tags qt;`;
 }
 
 function buildNameRegexQuery(keywords, bbox, resultLimit = 2000) {
@@ -45,7 +47,7 @@ function buildNameRegexQuery(keywords, bbox, resultLimit = 2000) {
     .filter(Boolean)
     .join('|');
   if (!pattern) return null;
-  return `[out:json][timeout:30];(node["name"~"${pattern}",i](${s},${w},${n},${e});way["name"~"${pattern}",i](${s},${w},${n},${e});relation["name"~"${pattern}",i](${s},${w},${n},${e}););out body center tags qt ${resultLimit};`;
+  return `[out:json][timeout:30];(node["name"~"${pattern}",i](${s},${w},${n},${e});way["name"~"${pattern}",i](${s},${w},${n},${e});relation["name"~"${pattern}",i](${s},${w},${n},${e}););out body center tags qt;`;
 }
 
 async function tryOverpassQuery(query, onRetry) {
