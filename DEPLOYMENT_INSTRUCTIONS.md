@@ -209,8 +209,9 @@ For registration emails, configure all of the following in Supabase:
 1. **Authentication → Providers → Email**: enable Email provider and enable **Confirm email**.
 2. **Authentication → URL Configuration**: set **Site URL** to the deployed Vercel URL, for example `https://vendlocate-master.vercel.app`.
 3. Add the deployed URL with `/verify-email` to **Redirect URLs**, for example `https://vendlocate-master.vercel.app/verify-email`.
-4. For reliable production delivery, configure **Authentication → SMTP Settings** with a transactional email provider. Supabase's default email service is rate-limited and may not deliver reliably for production use.
-5. Check **Authentication → Logs** after a signup or resend. A successful signup response only means Supabase accepted the request; the Auth logs and SMTP provider determine whether the message was actually sent.
+4. In Vercel, set `VITE_SITE_URL` to that same deployed URL (without a trailing slash), then redeploy. This makes both signup and resend links use the intended production origin instead of whichever host opened the form.
+5. For reliable production delivery, configure **Authentication → SMTP Settings** with a transactional email provider. Supabase's default email service is rate-limited and may not deliver reliably for production use.
+6. Check **Authentication → Logs** after a signup or resend. A successful signup response only means Supabase accepted the request; the Auth logs and SMTP provider determine whether the message was actually sent.
 
 ## 🔐 Security Checklist
 

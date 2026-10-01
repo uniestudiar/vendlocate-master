@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Mail, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
-import { supabase } from '../utils/supabase';
+import { authRedirectUrl, supabase } from '../utils/supabase';
 
 export default function EmailVerification() {
   const navigate = useNavigate();
@@ -74,6 +74,9 @@ export default function EmailVerification() {
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email,
+        options: {
+          emailRedirectTo: `${authRedirectUrl}/verify-email`,
+        },
       });
       if (error) throw error;
       setError('Confirmation email resent. Check your inbox and spam folder. If it does not arrive, verify Supabase Auth email settings and SMTP configuration.');
