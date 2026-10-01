@@ -539,7 +539,7 @@ app.post("/make-server-de060722/generate-leads", async (c) => {
     }
 
     const body = await c.req.json();
-    const { places, location, radiusMiles, businessTypes, senderName, emailTemplate } = body || {};
+    const { places, location, radiusMiles, businessTypes, senderName, phoneNumber, emailTemplate } = body || {};
 
     const alreadyEmailed = new Set<string>();
     try {
@@ -668,9 +668,19 @@ app.post("/make-server-de060722/generate-leads", async (c) => {
     const emailsSent: any[] = [];
     const subject = "Free modern vending machine upgrade for your business";
     const sender = senderName || "Evan";
-    const phoneLine = location?.phone ? `\nCall/Text: ${location.phone}\n` : "";
-    const defaultBody = templateBody(sender, phoneLine);
+    const contactPhone = phoneNumber || location?.phone || "";
+    if (!contactPhone) {
+      return c.json({ error: "Add your phone number before running a scan." }, 400);
+    }
+    const phoneLine = contactPhone ? `\nCall/Text: ${contactPhone}\n` : "";
+    const defaultBody = templateBody(sender, phoneLine).replace(/\{phone number\}/g, contactPhone);
     const bodyContent = emailTemplate || defaultBody;
+    if (emailTemplate &&
+        !emailTemplate.includes("{phone number}") &&
+        !emailTemplate.includes("{phone_number}") &&
+        !emailTemplate.includes("{{YOUR_PHONE}}")) {
+      return c.json({ error: "Your email template must include {phone number}." }, 400);
+    }
 
     for (const lead of leadsWithEmail) {
       if (alreadyEmailed.has(lead.email.toLowerCase())) continue;
@@ -679,7 +689,10 @@ app.post("/make-server-de060722/generate-leads", async (c) => {
         recipient: lead.email.toLowerCase(),
         email_type: "outreach_initial",
         subject,
-        body_preview: bodyContent.replace(/{business_name}/g, lead.business_name),
+        body_preview: bodyContent
+          .replace(/{business_name}/g, lead.business_name)
+          .replace(/\{phone number\}/g, contactPhone)
+          .replace(/\{phone_number\}/g, contactPhone),
         status: "sent",
         sent_at: new Date().toISOString(),
       }, {

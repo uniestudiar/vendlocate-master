@@ -1164,7 +1164,7 @@ export default async function handler(req, res) {
       auth: { persistSession: false },
     });
 
-    const { places, location, radiusMiles, businessTypes, senderName, emailTemplate } = body;
+    const { places, location, radiusMiles, businessTypes, senderName, phoneNumber, emailTemplate } = body;
 
     const { data: purchases, error: purchasesError } = await supabase
       .from('purchases')
@@ -1366,18 +1366,27 @@ export default async function handler(req, res) {
     const leadsWithEmail = processedLeads.filter((l) => l.email);
     const subject = 'Free modern vending machine upgrade for your business';
     const sender = senderName || 'Evan';
-    const phoneLine = location?.phone ? `\nCall/Text: ${location.phone}\n` : '';
-    const defaultBody = `Hi {business_name} Team,\n\nI run a small vending service that installs and maintains modern smart vending machines at NO COST to your business.\n\nWe handle installation, restocking, repairs, and maintenance.\n\nIf you already have vending machines, we can replace them with newer, more reliable smart machines.\n\nWould you be open to a quick conversation?\n\nBest,\n${sender}${phoneLine}`;
+    const contactPhone = phoneNumber || location?.phone || '';
+    if (!contactPhone) {
+      return res.status(400).json({ error: 'Add your phone number before running a scan.' });
+    }
+    const defaultBody = `Hi {business_name} Team,\n\nI run a small vending service that installs and maintains modern smart vending machines at NO COST to your business.\n\nWe handle installation, restocking, repairs, and maintenance.\n\nIf you already have vending machines, we can replace them with newer, more reliable smart machines.\n\nWould you be open to a quick conversation? Please give me a call at {phone number}.\n\nBest,\n${sender}`;
 
     let bodyTemplate = emailTemplate || defaultBody;
+    if (emailTemplate && !emailTemplate.includes('{phone number}') && !emailTemplate.includes('{phone_number}') && !emailTemplate.includes('{{YOUR_PHONE}}')) {
+      return res.status(400).json({ error: 'Your email template must include {phone number}.' });
+    }
     bodyTemplate = bodyTemplate.replace(/\{\{BUSINESS_NAME\}\}/g, '{business_name}');
     bodyTemplate = bodyTemplate.replace(/\{\{YOUR_NAME\}\}/g, sender);
-    bodyTemplate = bodyTemplate.replace(/\{\{YOUR_PHONE\}\}/g, location?.phone || '');
+    bodyTemplate = bodyTemplate.replace(/\{\{YOUR_PHONE\}\}/g, contactPhone);
 
     const emailsSent = [];
     for (const lead of leadsWithEmail) {
       if (alreadyEmailed.has(lead.email.toLowerCase())) continue;
-      const renderedBody = bodyTemplate.replace(/\{business_name\}/g, lead.business_name);
+      const renderedBody = bodyTemplate
+        .replace(/\{business_name\}/g, lead.business_name)
+        .replace(/\{phone number\}/g, contactPhone)
+        .replace(/\{phone_number\}/g, contactPhone);
       const { error: historyError } = await supabase
         .from('email_history')
         .upsert(
