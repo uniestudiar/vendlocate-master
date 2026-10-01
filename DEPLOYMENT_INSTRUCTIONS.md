@@ -4,7 +4,7 @@
 
 ### Authentication & Security
 - ✅ User registration with email verification
-- ✅ **Auto-login after email verification** (no manual login needed)
+- ✅ Email confirmation flow with an explicit login after verification
 - ✅ Secure login with Supabase Auth
 - ✅ Password reset functionality
 - ✅ Change password feature
@@ -54,7 +54,21 @@ supabase functions deploy make-server-de060722
 
 ### 3. Set Environment Variables
 
-In Supabase Dashboard → Edge Functions → Secrets, add:
+In Vercel → Project Settings → Environment Variables, add:
+
+```
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your_publishable_anon_key
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_publishable_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+STRIPE_PUBLISHABLE_KEY=pk_live_...
+STRIPE_SECRET_KEY=sk_live_...
+GOOGLE_PLACES_API_KEY=your_key_here
+ENABLE_TEST_PAYMENTS=false
+```
+
+In Supabase Dashboard → Edge Functions → Secrets, add the provider secrets used by the deployed function:
 
 ```
 GOOGLE_MAPS_API_KEY=your_key_here
@@ -74,7 +88,7 @@ For Gmail SMTP:
 
 ### 5. Test the Flow
 
-1. Register new account → Should auto-login after verification
+1. Register new account → Confirm the email, then log in
 2. Purchase package → Should redirect to onboarding
 3. Complete onboarding → Should save phone and template
 4. View dashboard → Should show leads
@@ -166,15 +180,8 @@ CSV HEADER;
 
 ## 🐛 Known Issues
 
-### "Website crashes after login"
-**Fix Applied**: Updated all components to use Supabase instead of localStorage.
-
-The crash was caused by:
-- Frontend trying to use localStorage
-- Backend expecting Supabase data
-- Mismatch caused undefined errors
-
-**Solution**: All auth now uses Supabase Auth, all data uses Supabase database.
+### "Login does not work"
+Confirm that `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured for the Vercel deployment, email confirmation is enabled in Supabase Auth, and the deployed URL is listed under Supabase Auth → URL Configuration → Redirect URLs.
 
 ## 🔐 Security Checklist
 
@@ -183,15 +190,15 @@ The crash was caused by:
 - [x] Row Level Security enabled
 - [x] JWT tokens for authentication
 - [x] SQL injection prevented (parameterized queries)
-- [x] CORS configured properly
-- [x] Authorization checks on all endpoints
+- [ ] CORS restricted to the deployed application origin
+- [x] Authorization checks on payment and database-backed endpoints
 - [ ] Rate limiting (TODO: add to Edge Functions)
 - [ ] Input validation (TODO: add more comprehensive checks)
 
 ## 📱 User Journey
 
 1. **Sign Up** → Enter name, email, password
-2. **Verify Email** → Enter 6-digit code → **Auto-login**
+2. **Verify Email** → Click the Supabase confirmation link → **Log in**
 3. **Purchase** → Select radius, business types, pay
 4. **Onboarding** → Add phone → Customize email → Review
 5. **Generation** → System finds locations automatically

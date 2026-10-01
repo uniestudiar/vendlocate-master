@@ -144,11 +144,15 @@ export default function AdminDashboard() {
         const result = await supabase.auth.getUser();
         supabaseUser = result.data?.user || null;
       } catch {
-        // Supabase Auth unavailable — use local user only
+        navigate('/login');
+        return;
       }
-      const currentUser = localStorage.getItem('vendlocate_current_user');
-      const user = supabaseUser || (currentUser ? JSON.parse(currentUser) : null);
-      setIsAuthenticated(!!user);
+      if (!supabaseUser) {
+        navigate('/login');
+        return;
+      }
+      const user = supabaseUser;
+      setIsAuthenticated(true);
 
       if (user?.email) {
         setSettings((current) => ({ ...current, outreachEmail: user.email }));
@@ -203,18 +207,6 @@ export default function AdminDashboard() {
         // Fallback: match by email if userId doesn't match
         if (!localPurchase && user?.email) {
           localPurchase = purchases.find((p: any) => p.email === user.email) || null;
-        }
-      }
-
-      // Fallback: use the latest purchase regardless of auth state
-      if (!localPurchase && purchases.length > 0) {
-        localPurchase = purchases[purchases.length - 1];
-        // Restore user info from purchase so downstream code works
-        if (!user && localPurchase) {
-          localStorage.setItem('vendlocate_current_user', JSON.stringify({
-            id: localPurchase.userId,
-            email: localPurchase.email,
-          }));
         }
       }
 
@@ -285,9 +277,6 @@ export default function AdminDashboard() {
           const { data: { user } } = await supabase.auth.getUser();
           localUserId = user?.id || null;
         } catch {}
-        if (!localUserId) {
-          try { localUserId = JSON.parse(localStorage.getItem('vendlocate_current_user') || '{}')?.id || null; } catch {}
-        }
         if (localUserId) {
           const { data, error } = await supabase
             .from('leads')
@@ -507,14 +496,14 @@ export default function AdminDashboard() {
     setBuyError('');
     setBuySuccess('');
 
-    const currentUser = JSON.parse(localStorage.getItem('vendlocate_current_user') || '{}');
-    const isTestUser = currentUser.email === 'evanbaker127@gmail.com';
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) throw new Error('Your session has expired. Please log in again.');
+      const currentUser = { id: session.user.id, email: session.user.email || '' };
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (session?.access_token) {
-        headers.Authorization = `Bearer ${session.access_token}`;
+        headers.Authorization = 'Bearer ' + session.access_token;
       }
 
       const purchases = JSON.parse(localStorage.getItem('vendlocate_purchases') || '[]');
@@ -726,9 +715,6 @@ export default function AdminDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       localUserId = user?.id || null;
     } catch {}
-    if (!localUserId) {
-      try { localUserId = JSON.parse(localStorage.getItem('vendlocate_current_user') || '{}')?.id || null; } catch {}
-    }
     if (localUserId) {
       try {
         const { data: existing } = await supabase
@@ -852,9 +838,6 @@ export default function AdminDashboard() {
           const { data: { user } } = await supabase.auth.getUser();
           localUserId = user?.id || null;
         } catch {}
-        if (!localUserId) {
-          try { localUserId = JSON.parse(localStorage.getItem('vendlocate_current_user') || '{}')?.id || null; } catch {}
-        }
         if (localUserId) {
           const { data, error } = await supabase
             .from('leads')
@@ -929,12 +912,6 @@ export default function AdminDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       localUserId = user?.id || null;
     } catch {}
-    if (!localUserId) {
-      try {
-        const raw = localStorage.getItem('vendlocate_current_user');
-        if (raw) localUserId = JSON.parse(raw)?.id || null;
-      } catch {}
-    }
     if (!localUserId) return;
 
     // Check for existing places in database to avoid duplicates and save API tokens
@@ -946,7 +923,7 @@ export default function AdminDashboard() {
     const existingNames = new Set((existingLeads || []).map(l => `${l.business_name.toLowerCase()}|${l.city.toLowerCase()}|${l.state.toLowerCase()}`));
     addTerminalLine(`  Found ${existingPlaceIds.size} existing leads in database — skipping duplicates`);
 
-    // Try Supabase purchase first, fall back to localStorage
+    // Read the active purchase from Supabase only.
     let purchaseId: string | null = null;
     const { data: purchase } = await supabase
       .from('purchases')
@@ -958,22 +935,11 @@ export default function AdminDashboard() {
       .maybeSingle();
     if (purchase?.id) {
       purchaseId = purchase.id;
-    } else {
-      try {
-        const purchases = JSON.parse(localStorage.getItem('vendlocate_purchases') || '[]');
-        const localPurchase = purchases.find((p: any) => p.userId === localUserId);
-        if (localPurchase?.id) purchaseId = localPurchase.id;
-      } catch {}
     }
-    // For test user, skip purchase requirement and use placeholder purchase_id
+    // Development-only test mode may scan without a paid purchase.
     if (!purchaseId) {
-      const isTestUser = (() => {
-        try {
-          const u = JSON.parse(localStorage.getItem('vendlocate_current_user') || '{}');
-          return u.email === 'evanbaker127@gmail.com';
-        } catch { return false; }
-      })();
-      if (!isTestUser) {
+      const isTestMode = import.meta.env.DEV && import.meta.env.VITE_ENABLE_TEST_PAYMENTS === 'true';
+      if (!isTestMode) {
         addTerminalLine('⚠ No purchase found — create one via Pricing page first.');
         return;
       }
@@ -1067,16 +1033,21 @@ export default function AdminDashboard() {
         const batch = noWebsiteBatch.slice(i, i + 5);
         const results = await Promise.allSettled(
           batch.map(entry =>
-            fetch('/api/find-website', {
+            supabase.auth.getSession().then(({ data: sessionData }) => fetch('/api/find-website', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                ...(sessionData.session?.access_token
+                  ? { Authorization: 'Bearer ' + sessionData.session.access_token }
+                  : {}),
+              },
               body: JSON.stringify({
                 businessName: entry.place.business_name,
                 city: entry.place.city,
                 state: entry.place.state,
               }),
               signal: AbortSignal.timeout(20000),
-            }).then(async resp => {
+            })).then(async resp => {
               if (!resp.ok) return null;
               const result = await resp.json();
               return result.url || null;
@@ -1166,7 +1137,6 @@ export default function AdminDashboard() {
     // Cache to localStorage so it loads on page refresh
     try {
       localStorage.setItem('vendlocate_leads', JSON.stringify(cleanRows));
-    } catch {}
 
     // Map to Lead[] format for the frontend
     const mappedLeads: Lead[] = cleanRows.map((lead: any) => ({

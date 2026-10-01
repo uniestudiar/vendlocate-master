@@ -12,11 +12,11 @@ export default function EmailVerification() {
 
   useEffect(() => {
     const pendingEmail = sessionStorage.getItem('pending_verification_email');
-    if (!pendingEmail) {
-      navigate('/register');
-      return;
-    }
-    setEmail(pendingEmail);
+    if (pendingEmail) setEmail(pendingEmail);
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.email) setEmail(data.user.email);
+      if (data.user?.email_confirmed_at) setConfirmed(true);
+    });
   }, [navigate]);
 
   useEffect(() => {
@@ -32,23 +32,11 @@ export default function EmailVerification() {
     setChecking(true);
     setError('');
     try {
-      // Try signing in — works if email is confirmed (even without a prior session)
-      const password = sessionStorage.getItem('pending_verification_password');
-      if (password) {
-        const { data, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (!signInError && data?.user?.email_confirmed_at) {
-          setConfirmed(true);
-          setChecking(false);
-          return;
-        }
-        if (signInError) {
-          setError(signInError.message || 'Login failed. Make sure you confirmed your email and try again.');
-          setChecking(false);
-          return;
-        }
+      const { data, error: sessionError } = await supabase.auth.getUser();
+      if (sessionError) throw sessionError;
+      if (data.user?.email_confirmed_at) {
+        setConfirmed(true);
+        return;
       }
       setError('Email not confirmed yet. Check your inbox (and spam folder), click the confirmation link, then try again.');
     } catch (err: any) {
@@ -59,21 +47,15 @@ export default function EmailVerification() {
   };
 
   const handleContinue = async () => {
-    const password = sessionStorage.getItem('pending_verification_password');
     sessionStorage.removeItem('pending_verification_email');
-    sessionStorage.removeItem('pending_verification_password');
-    try {
-      if (password) {
-        const { data } = await supabase.auth.signInWithPassword({ email, password });
-        if (data?.user) {
-          localStorage.setItem('vendlocate_current_user', JSON.stringify({
-            id: data.user.id,
-            email: data.user.email,
-            name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || data.user.email,
-          }));
-        }
-      }
-    } catch {}
+    const { data } = await supabase.auth.getUser();
+    if (data.user) {
+      localStorage.setItem('vendlocate_current_user', JSON.stringify({
+        id: data.user.id,
+        email: data.user.email,
+        name: data.user.user_metadata?.full_name || data.user.email,
+      }));
+    }
     navigate('/pricing');
   };
 

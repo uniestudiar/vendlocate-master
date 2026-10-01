@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Mail, Lock, ArrowLeft, MapPin, Loader2 } from 'lucide-react';
-import { supabase } from '../utils/supabase';
+import { supabase, supabaseConfigError } from '../utils/supabase';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -16,17 +16,20 @@ export default function Login() {
     setError('');
     setIsLoading(true);
 
-    // Clear any existing session first
-    localStorage.removeItem('vendlocate_current_user');
-    await supabase.auth.signOut();
-
     try {
+      if (supabaseConfigError) throw new Error(supabaseConfigError);
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (!signInError && data?.session) {
+      if (signInError) throw signInError;
+      if (data?.user && !data.user.email_confirmed_at) {
+        await supabase.auth.signOut();
+        throw new Error('Please confirm your email address before logging in.');
+      }
+
+      if (data?.session) {
         localStorage.setItem(
           'vendlocate_current_user',
           JSON.stringify({
@@ -40,19 +43,7 @@ export default function Login() {
         navigate('/dashboard');
         return;
       }
-
-      // Fallback: check for local-only user
-      const saved = localStorage.getItem('vendlocate_current_user');
-      if (saved) {
-        const localUser = JSON.parse(saved);
-        if (localUser.email === email) {
-          setIsLoading(false);
-          navigate('/dashboard');
-          return;
-        }
-      }
-
-      throw new Error('Invalid email or password');
+      throw new Error('Unable to create a session. Please try again.');
     } catch (err: any) {
       setError(err.message || 'Invalid email or password');
       setIsLoading(false);

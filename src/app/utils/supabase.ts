@@ -1,12 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = 'https://axawjnoxdlnbicnsxlwj.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4YXdqbm94ZGxuYmljbnN4bHdqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNjkzMzEsImV4cCI6MjA5NTg0NTMzMX0.FVg-2ah8ZK5AQwFhoLAubrxDO-Rxk4FzEiBRgZ9hb_I';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabaseConfigError =
+  !supabaseUrl || !supabaseAnonKey
+    ? 'Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in the deployment environment.'
+    : null;
 
-export const API_URL = `https://${supabaseUrl.split('//')[1].split('.')[0]}.supabase.co/functions/v1/make-server-de060722`;
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-anon-key'
+);
 
+export const API_URL =
+  import.meta.env.VITE_SUPABASE_FUNCTIONS_URL ||
+  (supabaseUrl ? `${supabaseUrl}/functions/v1/make-server-de060722` : '');
 export const VERCEL_API_URL = (() => {
   if (typeof window === 'undefined') return '/api';
   const origin = window.location.origin;
@@ -25,15 +34,19 @@ export interface User {
 }
 
 export const getAuthHeader = async () => {
-  try {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token ? `Bearer ${data.session.access_token}` : null;
-  } catch {
-    return null;
-  }
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return data.session?.access_token ? 'Bearer ' + data.session.access_token : null;
 };
 
+export const getCurrentUser = async () => {
+  if (supabaseConfigError) throw new Error(supabaseConfigError);
+  const { data, error } = await supabase.auth.getUser();
+  if (error) throw error;
+  return data.user;
+};
 export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
+  if (supabaseConfigError) throw new Error(supabaseConfigError);
   const authHeader = await getAuthHeader();
   const isLongRunning =
     endpoint === '/generate-leads' ||
@@ -71,7 +84,7 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
       err?.message?.includes('aborted') ||
       err?.message?.includes('The user aborted');
 
-    if (isNetworkError) {
+    if (isNetworkError || !API_URL) {
       try {
         if (endpoint === '/generate-leads' && (options.method || 'GET').toUpperCase() === 'POST') {
           return await vercelScanCall(options);
@@ -105,31 +118,9 @@ async function vercelScanCall(options: RequestInit) {
   return response.json();
 }
 
-function getLocalUserId(): string | null {
-  try {
-    const raw = localStorage.getItem('vendlocate_current_user');
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed?.id || null;
-  } catch {
-    return null;
-  }
-}
-
-function getLocalUserEmail(): string | null {
-  try {
-    const raw = localStorage.getItem('vendlocate_current_user');
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    return parsed?.email || null;
-  } catch {
-    return null;
-  }
-}
-
 async function directSupabaseCall(endpoint: string, options: RequestInit = {}) {
   const { data: { user: authUser } } = await supabase.auth.getUser();
-  const userId = authUser?.id || getLocalUserId();
+  const userId = authUser?.id;
   if (!userId) throw new Error('Not authenticated');
 
   if (endpoint === '/leads' && (!options.method || options.method === 'GET')) {
@@ -250,7 +241,7 @@ async function directSupabaseCall(endpoint: string, options: RequestInit = {}) {
       .from('users')
       .update({
         phone: body.phone || null,
-        outreach_email: body.outreachEmail || getLocalUserEmail() || '',
+        outreach_email: body.outreachEmail || authUser.email || '',
         smtp_app_password: body.smtpAppPassword || null,
         sender_name: body.senderName || null,
         email_template: body.emailTemplate || null,
@@ -272,7 +263,7 @@ async function directSupabaseCall(endpoint: string, options: RequestInit = {}) {
     return {
       settings: {
         phone: data?.phone || '',
-        outreachEmail: data?.outreach_email || getLocalUserEmail() || '',
+        outreachEmail: data?.outreach_email || authUser.email || '',
         smtpAppPassword: data?.smtp_app_password || '',
         senderName: data?.sender_name || 'Evan',
         emailTemplate: data?.email_template || '',

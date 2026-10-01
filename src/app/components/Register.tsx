@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Mail, Lock, User, ArrowLeft, MapPin, Loader2 } from 'lucide-react';
-import { supabase } from '../utils/supabase';
+import { supabase, supabaseConfigError } from '../utils/supabase';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -30,12 +30,8 @@ export default function Register() {
     }
 
     setIsLoading(true);
-    const localId = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2);
-
-    // Sign out any existing session first so the new account is clean
-    await supabase.auth.signOut();
-
     try {
+      if (supabaseConfigError) throw new Error(supabaseConfigError);
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -46,56 +42,16 @@ export default function Register() {
         },
       });
 
-      const userId = data?.user?.id || localId;
+      if (signUpError) throw signUpError;
+      if (!data.user) throw new Error('Account creation did not return a user.');
 
-      localStorage.setItem(
-        'vendlocate_current_user',
-        JSON.stringify({
-          id: userId,
-          email: formData.email,
-          name: formData.name,
-        })
-      );
-
-      if (!signUpError && userId) {
-        try {
-          await supabase.from('users').upsert({
-            id: userId,
-            email: formData.email,
-            full_name: formData.name,
-          });
-        } catch {
-          // Supabase sync is optional
-        }
-      }
-
+      sessionStorage.setItem('pending_verification_email', formData.email);
       setIsLoading(false);
-
-      // Navigate to pricing — if there's a session, great. If not, try signing in.
-      if (!data?.session && formData.password) {
-        supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        }).catch(() => {});
-      }
-      navigate('/pricing');
-      } catch {
-        // Signup failed (e.g. user already exists) — try signing in
-        localStorage.setItem(
-          'vendlocate_current_user',
-          JSON.stringify({
-            id: localId,
-            email: formData.email,
-            name: formData.name,
-          })
-        );
-        await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        }).catch(() => {});
-        setIsLoading(false);
-        navigate('/dashboard');
-      }
+      navigate('/verify-email');
+    } catch (err: any) {
+      setError(err.message || 'Unable to create your account');
+      setIsLoading(false);
+    }
   };
 
   return (
