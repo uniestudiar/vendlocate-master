@@ -213,6 +213,11 @@ For registration emails, configure all of the following in Supabase:
 5. For reliable production delivery, configure **Authentication → SMTP Settings** with a transactional email provider. Supabase's default email service is rate-limited and may not deliver reliably for production use.
 6. Check **Authentication → Logs** after a signup or resend. A successful signup response only means Supabase accepted the request; the Auth logs and SMTP provider determine whether the message was actually sent.
 
+Lead scanning records discovered recipient addresses in `email_history` with
+status `discovered`. That is not the same as an email being sent. Actual
+outreach delivery and rows in `sent_emails` require the separate Python worker
+(`src/imports/main.py`) to run with its SMTP and Supabase environment variables.
+
 ## 🔐 Security Checklist
 
 - [x] Passwords are hashed (Supabase Auth handles this)
