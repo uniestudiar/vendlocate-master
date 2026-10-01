@@ -11,6 +11,12 @@ export default function EmailVerification() {
   const [confirmed, setConfirmed] = useState(false);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const callbackError = params.get('error_description') || params.get('error');
+    if (callbackError) {
+      setError(`Email verification link error: ${callbackError.replace(/\+/g, ' ')}`);
+    }
+
     const pendingEmail = sessionStorage.getItem('pending_verification_email');
     if (pendingEmail) setEmail(pendingEmail);
     supabase.auth.getUser().then(({ data }) => {
@@ -60,13 +66,17 @@ export default function EmailVerification() {
   };
 
   const handleResend = async () => {
+    if (!email) {
+      setError('Enter your email again from the registration page before requesting another confirmation email.');
+      return;
+    }
     try {
       const { error } = await supabase.auth.resend({
         type: 'signup',
         email,
       });
       if (error) throw error;
-      setError('Confirmation email resent! Check your inbox (and spam folder).');
+      setError('Confirmation email resent. Check your inbox and spam folder. If it does not arrive, verify Supabase Auth email settings and SMTP configuration.');
     } catch (err: any) {
       setError(err.message || 'Failed to resend. You may need to configure SMTP in your Supabase dashboard.');
     }
