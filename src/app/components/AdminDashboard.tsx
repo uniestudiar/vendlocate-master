@@ -1137,6 +1137,7 @@ export default function AdminDashboard() {
     // Cache to localStorage so it loads on page refresh
     try {
       localStorage.setItem('vendlocate_leads', JSON.stringify(cleanRows));
+    } catch {}
 
     // Map to Lead[] format for the frontend
     const mappedLeads: Lead[] = cleanRows.map((lead: any) => ({
