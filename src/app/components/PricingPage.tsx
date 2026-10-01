@@ -57,7 +57,14 @@ export default function PricingPage() {
     // Always load saved location
     const savedLocation = localStorage.getItem('vendlocate_saved_location');
     if (savedLocation) {
-      setLocationData(JSON.parse(savedLocation));
+      try {
+        const parsedLocation = JSON.parse(savedLocation);
+        if (parsedLocation && typeof parsedLocation === 'object') {
+          setLocationData((current) => ({ ...current, ...parsedLocation }));
+        }
+      } catch {
+        localStorage.removeItem('vendlocate_saved_location');
+      }
     }
 
     supabase.auth.getUser().then(({ data, error }) => {
@@ -96,17 +103,6 @@ export default function PricingPage() {
         setIsLoading(false);
       });
   }, [navigate]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading pricing...</p>
-        </div>
-      </div>
-    );
-  }
 
   const basePrice = selectedRadius === 0 ? 0 : RADIUS_OPTIONS.find((r) => r.miles === selectedRadius)?.price || 197;
   const premiumTypesPrice = selectedBusinessTypes
@@ -163,6 +159,17 @@ export default function PricingPage() {
       }
     };
   }, [currentStep, stripePublishableKey]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading pricing...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleBusinessTypeToggle = (typeId: string) => {
     const type = BUSINESS_TYPES.find((bt) => bt.id === typeId);
