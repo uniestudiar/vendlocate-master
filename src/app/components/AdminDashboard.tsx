@@ -18,8 +18,6 @@ import {
   Send,
   Settings,
   CreditCard,
-  Phone,
-  KeyRound,
   Save,
   Loader2,
   Sliders,
@@ -626,16 +624,6 @@ export default function AdminDashboard() {
         `Click OK to lock and run, or Cancel to go back.`
       );
       if (!confirm) return;
-    }
-
-    // Validate contact details before scan
-    if (!settings.phone || settings.phone.length < 10) {
-      alert('Please add your phone number in the Settings tab before running a scan.\n\nGo to Settings → Outreach Settings → Phone Number.');
-      return;
-    }
-    if (!settings.smtpAppPassword || settings.smtpAppPassword.length < 10) {
-      alert('Please add your secure email app password in Settings before running a scan.\n\nThis is not your regular email password. It is a separate app-specific password from your email provider.');
-      return;
     }
 
     const selectedStandardCount = businessTypes.filter((bt) => bt.enabled && !bt.isPremium).length;
@@ -2235,9 +2223,9 @@ export default function AdminDashboard() {
         {currentTab === 'settings' && (
           <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">Outreach Settings</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-1">Email Template</h2>
               <p className="text-gray-600 mb-6">
-                Customize the contact details and email template used by the outreach engine.
+                Customize the message used when contacting businesses.
               </p>
 
               {settingsStatus && (
@@ -2245,80 +2233,6 @@ export default function AdminDashboard() {
                   {settingsStatus}
                 </div>
               )}
-
-              <div className="grid md:grid-cols-3 gap-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Phone Number</label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="tel"
-                      value={settings.phone}
-                      onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-                      placeholder="(555) 123-4567"
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Sending Email</label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="email"
-                      value={settings.outreachEmail}
-                      onChange={(e) => setSettings({ ...settings, outreachEmail: e.target.value })}
-                      placeholder="you@gmail.com"
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Secure Email App Password</label>
-                  <div className="relative">
-                    <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                    <input
-                      type="password"
-                      value={settings.smtpAppPassword}
-                      onChange={(e) => setSettings({ ...settings, smtpAppPassword: e.target.value })}
-                      placeholder="16-character app password"
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
-                <p className="text-sm text-amber-900 font-medium mb-2">What is a secure email app password?</p>
-                <p className="text-sm text-amber-800 mb-3">
-                  A secure email app password is a <strong>separate code</strong> from your email provider that lets VendLocate send messages without sharing your regular password.
-                </p>
-                <p className="text-sm font-medium text-amber-900 mb-1">How to generate one with Gmail:</p>
-                <ol className="list-decimal list-inside text-sm text-amber-800 space-y-1">
-                  <li>Go to your <a href="https://myaccount.google.com/security" target="_blank" className="underline font-medium">Google Account Security settings</a></li>
-                  <li>Turn on <strong>2-Step Verification</strong> if not already enabled</li>
-                  <li>Search for <strong>"App passwords"</strong> in the Google Account search bar</li>
-                  <li>Select <strong>Mail</strong> as the app and <strong>Windows Computer</strong> as the device</li>
-                  <li>Copy the generated 16-character code and paste it here</li>
-                </ol>
-                <p className="text-xs text-amber-700 mt-2">
-                  This password is stored securely and used only for your outreach messages.
-                </p>
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Your Name (used in emails)</label>
-                  <input
-                    type="text"
-                    value={settings.senderName}
-                    onChange={(e) => setSettings({ ...settings, senderName: e.target.value })}
-                    placeholder="Evan"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">This name appears as the sender in all outreach emails</p>
-                </div>
-              </div>
 
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Email Template</label>
