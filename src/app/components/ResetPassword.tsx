@@ -12,12 +12,18 @@ export default function ResetPassword() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    // Check if we have a valid session from the reset link
+    let hasRecoverySession = false;
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        navigate('/login');
-      }
+      hasRecoverySession = !!session;
+      if (!session) navigate('/login');
     });
+    const { data: listener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' && session) hasRecoverySession = true;
+    });
+    return () => {
+      listener.subscription.unsubscribe();
+      void hasRecoverySession;
+    };
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {

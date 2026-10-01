@@ -56,6 +56,22 @@ export default async function handler(req, res) {
       auth: { persistSession: false },
     });
 
+    const { data: purchase, error: purchaseError } = await supabase
+      .from('purchases')
+      .select('id, stripe_payment_intent_id, status')
+      .eq('id', purchaseId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (purchaseError) throw purchaseError;
+    if (!purchase) return res.status(404).json({ error: 'Purchase not found' });
+    if (
+      paymentIntentId &&
+      !paymentIntentId.startsWith('pi_test_') &&
+      purchase.stripe_payment_intent_id !== paymentIntentId
+    ) {
+      return res.status(400).json({ error: 'Payment does not match this purchase' });
+    }
+
     // Verify payment with Stripe if it's a real payment
     if (paymentIntentId && !paymentIntentId.startsWith('pi_test_')) {
       try {
@@ -74,7 +90,7 @@ export default async function handler(req, res) {
     const { error: updateError } = await supabase
       .from('purchases')
       .update({ status: 'active' })
-      .eq('id', purchaseId)
+      .eq('id', purchase.id)
       .eq('user_id', user.id);
 
     if (updateError) throw updateError;

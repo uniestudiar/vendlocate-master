@@ -12,7 +12,8 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 }
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
-const TEST_USER_EMAIL = 'evanbaker127@gmail.com';
+const TEST_PAYMENTS_ENABLED =
+  process.env.NODE_ENV !== 'production' && process.env.ENABLE_TEST_PAYMENTS === 'true';
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -50,9 +51,6 @@ export default async function handler(req, res) {
     const { user, error: authError } = await getAuthedUser(authHeader, bodyJwt);
     if (!user) return res.status(401).json({ error: authError || 'Unauthorized' });
 
-    const userEmail = user.email?.toLowerCase() || '';
-    const isTestUser = userEmail === TEST_USER_EMAIL;
-
     if (!body.acceptedTerms) {
       return res.status(400).json({ error: 'You must accept the Terms of Service and No-Refund Policy to purchase.' });
     }
@@ -75,13 +73,22 @@ export default async function handler(req, res) {
     if (!validRadius) {
       return res.status(400).json({ error: 'Invalid radius' });
     }
-    const basePrice = RADIUS_PRICES[radius as keyof typeof RADIUS_PRICES];
+    if (
+      !Array.isArray(businessTypes) ||
+      !Array.isArray(premiumTypes) ||
+      !Number.isInteger(extraSelections) ||
+      extraSelections < 0 ||
+      extraSelections > 100
+    ) {
+      return res.status(400).json({ error: 'Invalid purchase selections' });
+    }
+    const basePrice = RADIUS_PRICES[radius];
     const premiumCount = Array.isArray(premiumTypes) ? premiumTypes.length : 0;
     const extraCount = typeof extraSelections === 'number' ? extraSelections : 0;
     const expectedPrice = basePrice + premiumCount * PREMIUM_TYPE_PRICE + extraCount * EXTRA_SELECTION_PRICE;
     const clientPrice = typeof totalPrice === 'number' ? totalPrice : 0;
 
-    if (clientPrice < expectedPrice) {
+    if (clientPrice !== expectedPrice) {
       return res.status(400).json({ error: 'Price mismatch - invalid total' });
     }
 
@@ -104,8 +111,8 @@ export default async function handler(req, res) {
     const previousPrice = existingPurchase?.total_price || 0;
     const chargeAmountCents = Math.max(0, Math.round((clientPrice - previousPrice) * 100));
 
-    // TEST USER BYPASS: evanbaker127@gmail.com gets free purchases
-    if (isTestUser) {
+    // Development-only bypass; production always requires Stripe.
+    if (TEST_PAYMENTS_ENABLED) {
       const { data: purchase, error: insertError } = await supabase
         .from('purchases')
         .insert({
@@ -133,7 +140,7 @@ export default async function handler(req, res) {
         clientSecret: null,
         amount: 0,
         testBypass: true,
-        message: 'Test account — purchase created for free.',
+        message: 'Development test mode — purchase created for free.',
       });
     }
 

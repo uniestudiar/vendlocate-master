@@ -44,12 +44,7 @@ export default function PricingPage() {
   const stripeCardRef = useRef(null);
   const stripeInstanceRef = useRef(null);
 
-  const isTestUser = (() => {
-    try {
-      const u = JSON.parse(localStorage.getItem('vendlocate_current_user') || '{}');
-      return u.email === 'evanbaker127@gmail.com';
-    } catch { return false; }
-  })();
+  const isTestMode = import.meta.env.DEV && import.meta.env.VITE_ENABLE_TEST_PAYMENTS === 'true';
 
   const [isFirstPurchase, setIsFirstPurchase] = useState(true);
   const [extraLocationMode, setExtraLocationMode] = useState(false);
@@ -65,52 +60,31 @@ export default function PricingPage() {
       setLocationData(JSON.parse(savedLocation));
     }
 
-    // Always load current radius from purchase
-    const currentUser = localStorage.getItem('vendlocate_current_user');
-    if (currentUser) {
-      const user = JSON.parse(currentUser);
+    supabase.auth.getUser().then(({ data, error }) => {
+      if (error || !data.user) {
+        navigate('/login');
+        return;
+      }
+
+      const currentUser = data.user;
       const purchases = JSON.parse(localStorage.getItem('vendlocate_purchases') || '[]');
-      const userPurchase = purchases.find((p: any) => p.userId === user.id);
-      if (userPurchase?.radius) {
-        setSelectedRadius(userPurchase.radius);
-      }
-      if (userPurchase?.location) {
-        setLocationData(userPurchase.location);
-      }
-    }
+      const userPurchase = purchases.find((p: any) => p.userId === currentUser.id);
+      if (userPurchase?.radius) setSelectedRadius(userPurchase.radius);
+      if (userPurchase?.location) setLocationData(userPurchase.location);
 
-    if (params.get('action') === 'new-location') {
-      setExtraLocationMode(true);
-      setIsLoading(false);
-      return;
-    }
-    if (params.get('action') === 'upgrade-radius') {
-      setUpgradeRadiusMode(true);
-      setCurrentStep('radius');
-      setIsLoading(false);
-      return;
-    }
-    if (params.get('action') === 'add-selections') {
-      setAddSelectionsMode(true);
-      // Pre-populate from existing purchase
-      const user = JSON.parse(currentUser);
-      const purchases = JSON.parse(localStorage.getItem('vendlocate_purchases') || '[]');
-      const userPurchase = purchases.find((p: any) => p.userId === user.id);
-      if (userPurchase) {
-        setSelectedBusinessTypes(userPurchase.businessTypes || []);
-        setExtraSelections(userPurchase.extraSelections || 0);
+      if (params.get('action') === 'new-location') setExtraLocationMode(true);
+      if (params.get('action') === 'upgrade-radius') {
+        setUpgradeRadiusMode(true);
+        setCurrentStep('radius');
       }
-      setIsLoading(false);
-      return;
-    }
+      if (params.get('action') === 'add-selections') {
+        setAddSelectionsMode(true);
+        setSelectedBusinessTypes(userPurchase?.businessTypes || []);
+        setExtraSelections(userPurchase?.extraSelections || 0);
+      }
 
-    if (!currentUser) {
-      navigate('/login');
-      return;
-    }
-
-    // Load Stripe config
-    fetch('/api/stripe-config')
+      return fetch('/api/stripe-config');
+    })
       .then(r => r.json())
       .then(config => {
         if (config.publishableKey) {
@@ -152,7 +126,7 @@ export default function PricingPage() {
   useEffect(() => {
     if (currentStep !== 'payment') return;
     if (!stripePublishableKey) return;
-    if (isTestUser) return; // test user doesn't need Stripe Elements
+    if (isTestMode) return;
     if (stripeCardRef.current) return;
 
     async function init() {
@@ -210,22 +184,24 @@ export default function PricingPage() {
   const getAuthedFetchHeaders = async () => {
     const { data } = await supabase.auth.getSession();
     const token = data?.session?.access_token;
-    if (!token) {
-      // Fallback to localStorage user
-      const saved = localStorage.getItem('vendlocate_current_user');
-      return saved ? {} : {};
-    }
+    if (!token) throw new Error('Your session has expired. Please log in again.');
     return {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
+      Authorization: 'Bearer ' + token,
     };
   };
-
   const handleTestBypass = async () => {
+    if (!isTestMode) return;
     setPaymentError('');
     setIsProcessing(true);
 
-    const currentUser = JSON.parse(localStorage.getItem('vendlocate_current_user') || '{}');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setPaymentError('Your session has expired. Please log in again.');
+      setIsProcessing(false);
+      return;
+    }
+    const currentUser = { id: user.id, email: user.email || '' };
     const headers = await getAuthedFetchHeaders();
     if (!termsAccepted) {
       setPaymentError('You must agree to the Terms of Service and No-Refund Policy to continue.');
@@ -265,7 +241,13 @@ export default function PricingPage() {
     setPaymentError('');
     setIsProcessing(true);
 
-    const currentUser = JSON.parse(localStorage.getItem('vendlocate_current_user') || '{}');
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setPaymentError('Your session has expired. Please log in again.');
+      setIsProcessing(false);
+      return;
+    }
+    const currentUser = { id: user.id, email: user.email || '' };
     const headers = await getAuthedFetchHeaders();
 
     if (!termsAccepted) {
@@ -1016,7 +998,7 @@ export default function PricingPage() {
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Information</h3>
                 <div className="space-y-4">
-                  {isTestUser ? (
+                  {isTestMode ? (
                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                       <p className="text-green-800 font-semibold text-lg mb-2">
                         Test Account — Free Access
@@ -1067,7 +1049,7 @@ export default function PricingPage() {
                 </div>
               </div>
 
-              {!isTestUser && (
+              {!isTestMode && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-start gap-3">
                     <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
@@ -1079,7 +1061,7 @@ export default function PricingPage() {
                 </div>
               )}
 
-              {!isTestUser && (
+              {!isTestMode && (
                 <button
                   type={selectedRadius === 0 ? 'button' : 'submit'}
                   disabled={isProcessing || selectedRadius === 0 || !termsAccepted}

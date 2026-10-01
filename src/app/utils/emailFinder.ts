@@ -17,9 +17,15 @@ export async function findEmailForBusiness(place: {
   if (isSocialDomain(domain)) return { email: null, method: null, smtpVerified: false };
 
   try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) return { email: null, method: null, smtpVerified: false };
     const resp = await fetch('/api/find-emails', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: 'Bearer ' + token,
+      },
       body: JSON.stringify({
         website: place.website,
         businessName: place.business_name || null,
@@ -69,3 +75,4 @@ function isSocialDomain(domain: string): boolean {
     'bbb.org', 'yellowpages', 'manta.com'];
   return bad.some(b => domain.includes(b));
 }
+import { supabase } from './supabase';
