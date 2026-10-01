@@ -351,7 +351,8 @@ export default function AdminDashboard() {
       try {
         const emailResponse = await apiCall('/email-history');
         setEmailHistory(emailResponse.emails || []);
-      } catch {
+      } catch (error) {
+        console.error('Failed to load email history:', error);
         setEmailHistory([]);
       }
     };
@@ -1132,6 +1133,47 @@ export default function AdminDashboard() {
       addTerminalLine(`✓ ${savedCount}/${cleanRows.length} leads saved (${upsertErrors} batches had errors, skipped per-row)`);
     } else {
       addTerminalLine(`✓ All ${cleanRows.length} leads saved successfully`);
+    }
+
+    const discoveredEmailRows = cleanRows
+      .filter((lead) => lead.email)
+      .map((lead) => ({
+        user_id: localUserId,
+        recipient: lead.email.toLowerCase(),
+        email_type: 'outreach_initial',
+        subject: 'Free modern vending machine upgrade for your business',
+        body_preview: null,
+        status: 'discovered',
+        related_lead_id: null,
+        related_purchase_id: purchaseId.startsWith('purch_test_') ? null : purchaseId,
+        sent_at: null,
+      }));
+
+    if (discoveredEmailRows.length > 0 && !purchaseId.startsWith('purch_test_')) {
+      const { data: existingHistory, error: historyReadError } = await supabase
+        .from('email_history')
+        .select('recipient, email_type, subject')
+        .eq('user_id', localUserId)
+        .eq('email_type', 'outreach_initial');
+      const existingHistoryKeys = new Set(
+        (existingHistory || []).map((row) => `${row.recipient}|${row.email_type}|${row.subject}`)
+      );
+      const newHistoryRows = historyReadError
+        ? []
+        : discoveredEmailRows.filter(
+            (row) => !existingHistoryKeys.has(`${row.recipient}|${row.email_type}|${row.subject}`)
+          );
+      const { error: historyError } = historyReadError
+        ? { error: historyReadError }
+        : newHistoryRows.length > 0
+        ? await supabase.from('email_history').insert(newHistoryRows)
+        : { error: null };
+      if (historyError) {
+        console.error('Email history upsert error:', historyError);
+        addTerminalLine(`⚠ Email history was not saved: ${historyError.message}`);
+      } else {
+        addTerminalLine(`✓ ${newHistoryRows.length} discovered email${newHistoryRows.length === 1 ? '' : 's'} recorded in email history`);
+      }
     }
 
     // Cache to localStorage so it loads on page refresh

@@ -1206,7 +1206,10 @@ export default async function handler(req, res) {
           if (e.recipient) alreadyEmailed.add(e.recipient.toLowerCase());
         }
       }
-    } catch {}
+    } catch (historyReadError) {
+      console.error('Email history lookup failed:', historyReadError);
+      return res.status(500).json({ error: 'Unable to read email history. Verify the email_history table and RLS policies.' });
+    }
 
     // Check for existing leads in database to avoid duplicate processing and save API tokens
     const existingPlaceIds = new Set();
@@ -1363,6 +1366,10 @@ export default async function handler(req, res) {
         emailsSent.push({ email: lead.email, business: lead.business_name });
       } else if (historyError.code !== '23505') {
         console.error('Email history insert error:', historyError);
+        return res.status(500).json({
+          error: `Unable to record email history: ${historyError.message}`,
+          code: historyError.code,
+        });
       }
     }
 
