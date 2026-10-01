@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { apiCall, supabase } from '../utils/supabase';
 import { discoverBusinessesMultiSource } from '../utils/osmDiscovery';
+import { findEmailForBusiness } from '../utils/emailFinder';
 import { ALL_BUSINESS_TYPES, BusinessTypeDef } from '../utils/businessTypes';
 import TermsModal from './TermsModal';
 import {
@@ -726,6 +727,7 @@ export default function AdminDashboard() {
     const seenOsmIds = new Set<string>();
     const radiusMeters = currentRadiusMiles * 1609.34;
     const existingPlaceNames = new Set<string>();
+    const existingWebsites = new Set<string>();
 
     // Load existing leads from DB so we skip discovery for already-known places (saves API tokens)
     let localUserId: string | null = null;
@@ -737,12 +739,14 @@ export default function AdminDashboard() {
       try {
         const { data: existing } = await supabase
           .from('leads')
-          .select('place_id, business_name, city, state')
+          .select('place_id, business_name, city, state, website')
           .eq('user_id', localUserId);
         if (existing) {
           for (const row of existing) {
             if (row.place_id) seenOsmIds.add(row.place_id);
-            existingPlaceNames.add(`${(row.business_name || '').toLowerCase().trim()}|${(row.city || '').toLowerCase().trim()}|${(row.state || '').toLowerCase().trim()}`);
+            existingPlaceNames.add(makeBusinessKey(row.business_name, row.city, row.state));
+            const website = normalizeWebsite(row.website);
+            if (website) existingWebsites.add(website);
           }
           addTerminalLine(`  Found ${existing.length} existing leads — skipping them in discovery to save API tokens`);
         }
@@ -791,8 +795,9 @@ export default function AdminDashboard() {
           if (discoveredPlaces.length >= 5000) break;
           if (!p.place_id || seenOsmIds.has(p.place_id)) continue;
           seenOsmIds.add(p.place_id);
-          const nameKey = `${(p.business_name || '').toLowerCase().trim()}|${(p.city || '').toLowerCase().trim()}|${(p.state || '').toLowerCase().trim()}`;
-          if (existingPlaceNames.has(nameKey)) continue;
+          const nameKey = makeBusinessKey(p.business_name, p.city || editLocation.city, p.state || editLocation.state);
+          const normalizedWebsite = normalizeWebsite(p.website);
+          if (existingPlaceNames.has(nameKey) || (normalizedWebsite && existingWebsites.has(normalizedWebsite))) continue;
           const placeDistance = typeof p.distance === 'number' && p.distance > 0
             ? p.distance
             : (typeof p.lat === 'number' && typeof p.lng === 'number'
@@ -935,10 +940,11 @@ export default function AdminDashboard() {
     // Check for existing places to avoid duplicates and reduce external API usage.
     const { data: existingLeads } = await supabase
       .from('leads')
-      .select('place_id, business_name, city, state')
+      .select('place_id, business_name, city, state, website')
       .eq('user_id', localUserId);
     const existingPlaceIds = new Set((existingLeads || []).map(l => l.place_id));
-    const existingNames = new Set((existingLeads || []).map(l => `${l.business_name.toLowerCase()}|${l.city.toLowerCase()}|${l.state.toLowerCase()}`));
+    const existingNames = new Set((existingLeads || []).map(l => makeBusinessKey(l.business_name, l.city, l.state)));
+    const existingWebsites = new Set((existingLeads || []).map(l => normalizeWebsite(l.website)).filter(Boolean));
     addTerminalLine(`  Found ${existingPlaceIds.size} existing leads — skipping duplicates`);
 
     // Read the active purchase from the signed-in account.
@@ -992,12 +998,13 @@ export default function AdminDashboard() {
         (name && city && `nm_${name}_${city}`) ||
         (name && `nm_${name}`) ||
         null;
-      if (!pid || seenPids.has(pid) || existingPlaceIds.has(pid)) {
+      const normalizedWebsite = normalizeWebsite(p.website);
+      if (!pid || seenPids.has(pid) || existingPlaceIds.has(pid) || (normalizedWebsite && existingWebsites.has(normalizedWebsite))) {
         if (existingPlaceIds.has(pid)) skippedCount++;
         continue;
       }
       // Also check by name+city+state combo
-      const nameKey = `${name}|${city}|${state}`;
+      const nameKey = makeBusinessKey(name, city, state);
       if (existingNames.has(nameKey)) {
         skippedCount++;
         continue;
@@ -1092,11 +1099,17 @@ export default function AdminDashboard() {
     // Find emails for all businesses with websites in parallel (batches of 10)
     if (websiteBatches.length > 0) {
       addTerminalLine(`  Finding emails for ${websiteBatches.length} businesses with websites...`);
-      const { findEmailForBusiness } = await import('../utils/emailFinder');
       for (let i = 0; i < websiteBatches.length; i += 10) {
         const batch = websiteBatches.slice(i, i + 10);
         const results = await Promise.allSettled(
-          batch.map(b => findEmailForBusiness(b.place))
+          batch.map(async (b) => {
+            try {
+              return await findEmailForBusiness(b.place);
+            } catch (error) {
+              console.warn('Email lookup failed for business:', b.place?.business_name, error);
+              return { email: null, method: null, smtpVerified: false };
+            }
+          })
         );
         for (let j = 0; j < results.length; j++) {
           const r = results[j];
@@ -2291,6 +2304,24 @@ export default function AdminDashboard() {
       </div>
     </div>
   );
+}
+
+function normalizeBusinessText(value: unknown) {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function makeBusinessKey(name: unknown, city: unknown, state: unknown) {
+  return `${normalizeBusinessText(name)}|${normalizeBusinessText(city)}|${normalizeBusinessText(state)}`;
+}
+
+function normalizeWebsite(value: unknown) {
+  if (!value) return '';
+  try {
+    const url = new URL(String(value).startsWith('http') ? String(value) : `https://${value}`);
+    return url.hostname.replace(/^www\./i, '').toLowerCase();
+  } catch {
+    return String(value).trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
+  }
 }
 
 function defaultEmailTemplate(senderName: string) {
