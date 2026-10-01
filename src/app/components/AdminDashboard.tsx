@@ -337,6 +337,7 @@ export default function AdminDashboard() {
             notes: l.notes || '',
             estimatedFootTraffic: 'Calculated during scan',
             distanceFromClient: Number(l.distance_from_client || 0),
+          }));
           setLeads(mapped);
           setFilteredLeads(mapped);
         } else {
