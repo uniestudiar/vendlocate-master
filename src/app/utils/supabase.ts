@@ -13,7 +13,7 @@ function validateSupabaseUrl(value: string): string | null {
     return 'VITE_SUPABASE_URL must be the project URL, such as https://your-project-ref.supabase.co. Do not use the Supabase dashboard URL or project ID.';
   }
 
-  if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname) {
+  if (parsed.protocol !== 'https:' || !parsed.hostname) {
     return 'VITE_SUPABASE_URL must be an absolute HTTPS project URL, such as https://your-project-ref.supabase.co.';
   }
 
