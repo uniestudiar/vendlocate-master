@@ -626,6 +626,16 @@ export default function AdminDashboard() {
       if (!confirm) return;
     }
 
+    const emailTemplate = settings.emailTemplate || defaultEmailTemplate(settings.senderName);
+    if (!settings.phone.trim()) {
+      alert('Please enter your phone number in Settings before running a scan.');
+      return;
+    }
+    if (!emailTemplate.includes('{phone number}')) {
+      alert('Your email template does not include {phone number}. Add that placeholder where you want businesses to see your phone number, then try again.');
+      return;
+    }
+
     const selectedStandardCount = businessTypes.filter((bt) => bt.enabled && !bt.isPremium).length;
     if (selectedStandardCount > maxSelections) {
       alert(`Your package includes up to ${maxSelections} standard business types. Remove extras or purchase more selections before running a scan.`);
@@ -2235,23 +2245,33 @@ export default function AdminDashboard() {
               )}
 
               <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Your Phone Number</label>
+                <input
+                  type="tel"
+                  value={settings.phone}
+                  onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+                  placeholder="(555) 123-4567"
+                  className="w-full px-4 py-2 mb-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
                 <label className="block text-sm font-medium text-gray-700 mb-2">Email Template</label>
                 <p className="text-xs text-gray-500 mb-2">
-                  Edit the email sent to every business. Use {'{business_name}'} where the business name should appear.
+                  Edit the email sent to every business. Use {'{business_name}'} for the business name and {'{phone number}'} for your phone number.
                 </p>
                 <textarea
-                  value={settings.emailTemplate || `Hi {business_name} Team,\n\nI run a small vending service that installs and maintains modern smart vending machines at NO COST to your business.\n\nWe handle installation, restocking, repairs, and maintenance.\n\nIf you already have vending machines, we can replace them with newer, more reliable smart machines.\n\nWould you be open to a quick conversation?\n\nBest,\n${settings.senderName || 'Evan'}`}
+                  value={settings.emailTemplate || defaultEmailTemplate(settings.senderName)}
                   onChange={(e) => setSettings({ ...settings, emailTemplate: e.target.value })}
                   rows={12}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent font-mono text-sm"
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Preview: The {'{business_name}'} tag gets replaced with each business's actual name when the email is sent.
+                  Preview: {'{business_name}'} is replaced with the business name and {'{phone number}'} is replaced with your phone number.
                 </p>
                 <div className="mt-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
                   <p className="text-xs font-medium text-gray-700 mb-1">Preview with a sample business:</p>
                   <p className="text-xs text-gray-600 whitespace-pre-wrap">
-                    {(settings.emailTemplate || `Hi {business_name} Team,\n\nI run a small vending service that installs and maintains modern smart vending machines at NO COST to your business.\n\nWe handle installation, restocking, repairs, and maintenance.\n\nIf you already have vending machines, we can replace them with newer, more reliable smart machines.\n\nWould you be open to a quick conversation?\n\nBest,\n${settings.senderName || 'Evan'}`).replace('{business_name}', 'Sunshine Laundromat')}
+                    {(settings.emailTemplate || defaultEmailTemplate(settings.senderName))
+                      .replace(/\{business_name\}/g, 'Sunshine Laundromat')
+                      .replace(/\{phone number\}/g, settings.phone || '[Your phone number]')}
                   </p>
                 </div>
               </div>
@@ -2271,6 +2291,21 @@ export default function AdminDashboard() {
       </div>
     </div>
   );
+}
+
+function defaultEmailTemplate(senderName: string) {
+  return `Hi {business_name} Team,
+
+I run a small vending service that installs and maintains modern smart vending machines at NO COST to your business.
+
+We handle installation, restocking, repairs, and maintenance.
+
+If you already have vending machines, we can replace them with newer, more reliable smart machines.
+
+Would you be open to a quick conversation? Please give me a call at {phone number}.
+
+Best,
+${senderName || 'Evan'}`;
 }
 
 function estimateProfitScore(name: string, businessType: string): number {
