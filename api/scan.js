@@ -1168,7 +1168,7 @@ export default async function handler(req, res) {
 
     const { data: purchases, error: purchasesError } = await supabase
       .from('purchases')
-      .select('id')
+      .select('id, radius_miles, business_types, extra_selections, premium_types')
       .eq('user_id', user.id)
       .eq('status', 'active')
       .order('purchase_date', { ascending: false })
@@ -1179,6 +1179,36 @@ export default async function handler(req, res) {
     }
     if (!purchases || purchases.length === 0) {
       return res.status(400).json({ error: 'No active purchase found.' });
+    }
+
+    const purchase = purchases[0];
+    let purchasedTypes = [];
+    try {
+      purchasedTypes = Array.isArray(purchase.business_types)
+        ? purchase.business_types
+        : typeof purchase.business_types === 'string'
+        ? JSON.parse(purchase.business_types)
+        : [];
+    } catch {
+      return res.status(500).json({ error: 'Your purchase settings could not be read. Please contact support.' });
+    }
+    const requestedTypes = Array.isArray(businessTypes) ? businessTypes : [];
+    if (requestedTypes.length > 0 && purchasedTypes.length > 0) {
+      const purchasedTypeSet = new Set(purchasedTypes);
+      const unauthorizedType = requestedTypes.find((type) => {
+        const value = typeof type === 'string' ? type : type?.id || type?.name;
+        return value && !purchasedTypeSet.has(value);
+      });
+      if (unauthorizedType) {
+        return res.status(403).json({
+          error: 'This business type is not included in your purchased package. Purchase additional selections before searching it.',
+        });
+      }
+    }
+    if (Number.isFinite(radiusMiles) && Number(radiusMiles) > Number(purchase.radius_miles || 0)) {
+      return res.status(403).json({
+        error: 'This search radius is larger than your purchased package. Upgrade your package before searching farther.',
+      });
     }
 
     const inputPlaces = Array.isArray(places) ? places.slice(0, 5000) : [];

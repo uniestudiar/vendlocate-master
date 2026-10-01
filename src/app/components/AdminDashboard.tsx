@@ -428,6 +428,7 @@ export default function AdminDashboard() {
 
 
   const updateBusinessType = (id: string, updates: Partial<BusinessTypeDef>) => {
+    if (isLocationLocked) return;
     setBusinessTypes(businessTypes.map((bt) => {
       if (bt.id === id && updates.enabled === true && !bt.enabled && !bt.isPremium) {
         const currentEnabled = businessTypes.filter(b => b.id !== id && b.enabled && !b.isPremium).length;
@@ -637,6 +638,16 @@ export default function AdminDashboard() {
       return;
     }
 
+    const selectedStandardCount = businessTypes.filter((bt) => bt.enabled && !bt.isPremium).length;
+    if (selectedStandardCount > maxSelections) {
+      alert(`Your package includes up to ${maxSelections} standard business types. Remove extras or purchase more selections before running a scan.`);
+      return;
+    }
+    if (businessTypes.filter((bt) => bt.enabled).length === 0) {
+      alert('Select at least one business type before running a scan.');
+      return;
+    }
+
     setIsRunning(true);
     setShowTerminal(true);
     setTerminalLines([]);
@@ -661,12 +672,20 @@ export default function AdminDashboard() {
           }),
         });
         addTerminalLine(`Location saved: ${editLocation.city || 'N/A'}, ${editLocation.state || 'N/A'}`);
-      } catch { addTerminalLine('Saved location to your account'); }
+      } catch (error: any) {
+        addTerminalLine(`Unable to save your location: ${error?.message || 'please try again'}`);
+        setIsRunning(false);
+        return;
+      }
       try {
         await apiCall('/user-locations/lock', { method: 'POST' });
         setIsLocationLocked(true);
         addTerminalLine('Location locked permanently');
-      } catch { addTerminalLine('Locked location on your account'); }
+      } catch (error: any) {
+        addTerminalLine(`Unable to lock your location: ${error?.message || 'please try again'}`);
+        setIsRunning(false);
+        return;
+      }
     } else {
       addTerminalLine('Location already locked.');
     }
@@ -1841,7 +1860,7 @@ export default function AdminDashboard() {
               <div className="mb-6">
                 <h2 className="text-2xl font-bold text-gray-900">Search Settings</h2>
                 <p className="text-gray-600 mt-1">
-                  Configure which business types the discovery engine searches for. Changes take effect on the next scan.
+                  Choose your business types before the first scan. After you run a scan, your location and selections are locked so the package limit cannot be reused.
                 </p>
               </div>
 
@@ -1868,7 +1887,7 @@ export default function AdminDashboard() {
                             <input
                               type="checkbox"
                               checked={bt.enabled}
-                              disabled={atCap}
+                              disabled={isLocationLocked || atCap}
                               onChange={(e) => updateBusinessType(bt.id, { enabled: e.target.checked })}
                               className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500"
                             />
@@ -1907,10 +1926,11 @@ export default function AdminDashboard() {
                               Add · ${bt.premiumPrice}
                             </Link>
                           )}
-                          <label className="flex items-center gap-2 cursor-pointer">
+                          <label className={`flex items-center gap-2 ${isLocationLocked ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
                             <input
                               type="checkbox"
                               checked={bt.enabled}
+                              disabled={isLocationLocked}
                               onChange={(e) => updateBusinessType(bt.id, { enabled: e.target.checked })}
                               className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500"
                             />
@@ -1929,6 +1949,11 @@ export default function AdminDashboard() {
                   <h3 className="text-lg font-semibold text-gray-900">Need More Selections?</h3>
                 </div>
                 <div className="border border-gray-200 rounded-lg p-4">
+                  {isLocationLocked && (
+                    <p className="mb-3 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      Your included business types are locked because this package has already been run. Purchase additional selections to add more types.
+                    </p>
+                  )}
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-medium text-gray-900">Extra Standard Selections</p>
