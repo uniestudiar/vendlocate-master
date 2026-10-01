@@ -337,7 +337,6 @@ export default function AdminDashboard() {
             notes: l.notes || '',
             estimatedFootTraffic: 'Calculated during scan',
             distanceFromClient: Number(l.distance_from_client || 0),
-          }));
           setLeads(mapped);
           setFilteredLeads(mapped);
         } else {
@@ -854,20 +853,24 @@ export default function AdminDashboard() {
         setFilteredLeads(saveResult.leads);
         addTerminalLine(`Loaded ${saveResult.leads.length} leads into dashboard.`);
       } else {
-        // Fallback: try the connected account service directly
+        // Reload the complete saved list, including when this scan added no new rows.
         addTerminalLine('Checking your saved leads...');
-        let localUserId: string | null = null;
+        let data: any[] | null = null;
         try {
+          const response = await apiCall('/leads');
+          data = response.leads || null;
+        } catch {
           const { data: { user } } = await supabase.auth.getUser();
-          localUserId = user?.id || null;
-        } catch {}
-        if (localUserId) {
-          const { data, error } = await supabase
-            .from('leads')
-            .select('*')
-            .eq('user_id', localUserId)
-            .order('created_at', { ascending: false });
-          if (!error && data && data.length > 0) {
+          if (user) {
+            const result = await supabase
+              .from('leads')
+              .select('*')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false });
+            data = result.data || null;
+          }
+        }
+        if (data && data.length > 0) {
             const mapped = data.map((lead: any) => ({
               id: lead.id || String(Math.random()),
               businessName: lead.business_name || 'Unknown Business',
@@ -892,14 +895,11 @@ export default function AdminDashboard() {
               distanceFromClient: Number(lead.distance_from_client || 0),
               userLocationId: lead.user_location_id || undefined,
             }));
-            setLeads(mapped);
-            setFilteredLeads(mapped);
-            addTerminalLine(`Loaded ${mapped.length} saved leads.`);
-          } else {
-            addTerminalLine('Leads saved — they will appear on next page load.');
-          }
+          setLeads(mapped);
+          setFilteredLeads(mapped);
+          addTerminalLine(`Loaded ${mapped.length} saved leads.`);
         } else {
-          addTerminalLine('Leads saved — they will appear on next page load.');
+          addTerminalLine('No saved leads were returned. Refresh once and try again if this is unexpected.');
         }
       }
     } catch {
@@ -935,7 +935,9 @@ export default function AdminDashboard() {
       const { data: { user } } = await supabase.auth.getUser();
       localUserId = user?.id || null;
     } catch {}
-    if (!localUserId) return;
+    if (!localUserId) {
+      throw new Error('Your session expired. Please sign in again before saving leads.');
+    }
 
     // Check for existing places to avoid duplicates and reduce external API usage.
     const { data: existingLeads } = await supabase
